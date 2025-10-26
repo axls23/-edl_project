@@ -1,11 +1,12 @@
 import numpy as np
+import matplotlib
+# Set non-interactive backend before importing pyplot to avoid tkinter issues
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from matplotlib.colors import LinearSegmentedColormap
 import cv2
 import base64
 from io import BytesIO
-import json
 from utils import format_percentage
 
 class VisualizationGenerator:
@@ -51,6 +52,13 @@ class VisualizationGenerator:
         except Exception as e:
             print(f"Visualization generation error: {e}")
             return {'error': str(e)}
+        finally:
+            # Ensure all matplotlib resources are cleaned up
+            plt.close('all')
+    
+    def cleanup(self):
+        """Cleanup matplotlib resources"""
+        plt.close('all')
     
     def _create_overview_visualization(self, results):
         """Create overview visualization with main similarity score"""
@@ -90,14 +98,21 @@ class VisualizationGenerator:
             scores = []
             colors = ['#dc2626', '#f59e0b', '#ef4444', '#f97316']
             
-            for i, (method, weight) in enumerate([('Deep Learning', 0.35), 
-                                                ('Perceptual Hash', 0.20), 
-                                                ('CV Methods', 0.25), 
-                                                ('Probabilistic', 0.20)]):
-                if method.lower().replace(' ', '_') in results:
-                    method_key = method.lower().replace(' ', '_')
+            # Use correct weights matching similarity_engine_v2.py
+            weight_map = {
+                'deep_learning': 0.50,
+                'cv_methods': 0.25, 
+                'probabilistic': 0.10,      # CORRECTED: was 0.15
+                'perceptual_hash': 0.15     # CORRECTED: was 0.10
+            }
+            
+            for method_key in ['deep_learning', 'perceptual_hash', 'cv_methods', 'probabilistic']:
+                if method_key in results:
+                    # Convert key to display name
+                    display_name = method_key.replace('_', ' ').title()
                     score = results[method_key].get('score', 0)
-                    methods.append(f"{method}\n({weight:.0%})")
+                    weight = weight_map.get(method_key, 0.25)
+                    methods.append(f"{display_name}\n({weight:.0%})")
                     scores.append(score)
             
             bars = ax2.bar(methods, scores, color=colors[:len(methods)], width=0.6)
@@ -221,8 +236,20 @@ class VisualizationGenerator:
             axes[1].set_title('Image 2', fontsize=14, fontweight='bold')
             axes[1].axis('off')
             
-            # Difference image
-            diff = cv2.absdiff(image1, image2)
+            # Difference image - resize to same dimensions if needed
+            h1, w1 = image1.shape[:2]
+            h2, w2 = image2.shape[:2]
+
+            if h1 != h2 or w1 != w2:
+                # Use the larger dimensions
+                target_h = max(h1, h2)
+                target_w = max(w1, w2)
+                img1_resized = cv2.resize(image1, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+                img2_resized = cv2.resize(image2, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+                diff = cv2.absdiff(img1_resized, img2_resized)
+            else:
+                diff = cv2.absdiff(image1, image2)
+
             axes[2].imshow(diff)
             axes[2].set_title('Difference Map', fontsize=14, fontweight='bold')
             axes[2].axis('off')
@@ -250,13 +277,20 @@ class VisualizationGenerator:
             scores = []
             weights = []
             
-            for method, weight in [('Deep Learning', 0.35), ('Perceptual Hash', 0.20), 
-                                 ('CV Methods', 0.25), ('Probabilistic', 0.20)]:
-                method_key = method.lower().replace(' ', '_')
+            # Use correct weights matching similarity_engine_v2.py
+            weight_map = {
+                'deep_learning': 0.50,
+                'cv_methods': 0.25,
+                'probabilistic': 0.10,      # CORRECTED: was 0.15
+                'perceptual_hash': 0.15     # CORRECTED: was 0.10
+            }
+            
+            for method_key in ['deep_learning', 'perceptual_hash', 'cv_methods', 'probabilistic']:
                 if method_key in results:
-                    methods.append(method)
+                    display_name = method_key.replace('_', ' ').title()
+                    methods.append(display_name)
                     scores.append(results[method_key].get('score', 0))
-                    weights.append(weight)
+                    weights.append(weight_map.get(method_key, 0.25))
             
             colors = ['#dc2626', '#f59e0b', '#ef4444', '#f97316']
             bars = ax.bar(methods, scores, color=colors, width=0.6)
@@ -395,9 +429,13 @@ class VisualizationGenerator:
             fig.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
             buffer.seek(0)
             image_base64 = base64.b64encode(buffer.getvalue()).decode()
+            buffer.close()
             plt.close(fig)
+            # Clear the current figure to release all resources
+            plt.clf()
             return f"data:image/png;base64,{image_base64}"
         except Exception as e:
             print(f"Figure to base64 conversion error: {e}")
+            plt.close('all')  # Close all figures on error
             return None
 

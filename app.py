@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify, render_template, send_from_directory
 import os
 import uuid
-import json
 from werkzeug.utils import secure_filename
 from similarity_engine_v2 import SimilarityEngineV2
 from visualizations import VisualizationGenerator
@@ -25,6 +24,9 @@ def index():
 @app.route('/upload', methods=['POST'])
 def upload_images():
     """Handle image uploads and trigger similarity computation"""
+    image1_path = None
+    image2_path = None
+
     try:
         if 'image1' not in request.files or 'image2' not in request.files:
             return jsonify({'error': 'Both images are required'}), 400
@@ -64,6 +66,9 @@ def upload_images():
             processed_img1, processed_img2, results, image1_path, image2_path
         )
         
+        # Cleanup matplotlib resources
+        viz_generator.cleanup()
+        
         # Store results
         job_results[job_id] = {
             'results': results,
@@ -73,9 +78,11 @@ def upload_images():
         }
         
         # Clean up temporary files
-        os.remove(image1_path)
-        os.remove(image2_path)
-        
+        if os.path.exists(image1_path):
+            os.remove(image1_path)
+        if os.path.exists(image2_path):
+            os.remove(image2_path)
+
         return jsonify({
             'job_id': job_id,
             'results': results,
@@ -83,6 +90,17 @@ def upload_images():
         })
         
     except Exception as e:
+        # Clean up files on error
+        if image1_path and os.path.exists(image1_path):
+            os.remove(image1_path)
+        if image2_path and os.path.exists(image2_path):
+            os.remove(image2_path)
+
+        # Log the full error for debugging
+        import traceback
+        app.logger.error(f"Error processing images: {str(e)}")
+        app.logger.error(traceback.format_exc())
+
         return jsonify({'error': str(e)}), 500
 
 @app.route('/results/<job_id>')
@@ -102,4 +120,3 @@ if __name__ == '__main__':
     # Create uploads directory if it doesn't exist
     os.makedirs('static/uploads', exist_ok=True)
     app.run(debug=True, host='0.0.0.0', port=5000)
-

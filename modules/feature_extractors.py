@@ -7,13 +7,10 @@ from skimage.feature import local_binary_pattern
 from skimage.metrics import structural_similarity as ssim
 import imagehash
 from PIL import Image
-import tensorflow as tf
 from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.applications.resnet50 import preprocess_input
 from sklearn.mixture import GaussianMixture
 from sklearn.metrics.pairwise import cosine_similarity
-from scipy.spatial.distance import cosine
-from scipy.stats import entropy
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -21,13 +18,25 @@ class DeepLearningExtractor:
     """Deep learning feature extraction using pre-trained models"""
     
     def __init__(self):
-        self.model = ResNet50(weights='imagenet', include_top=False, pooling='avg')
+        # Feature extraction model (no top layer)
+        self.feature_model = ResNet50(weights='imagenet', include_top=False, pooling='avg')
+        # Classification model (with top layer for category detection)
+        self.classification_model = ResNet50(weights='imagenet', include_top=True)
     
     def extract_features(self, image):
         """Extract features using ResNet50"""
         processed = self._preprocess_image(image)
-        features = self.model.predict(processed, verbose=0)
+        features = self.feature_model.predict(processed, verbose=0)
         return features
+    
+    def classify_image(self, image):
+        """Classify image to detect object categories"""
+        processed = self._preprocess_image(image)
+        predictions = self.classification_model.predict(processed, verbose=0)
+        # Get top 5 predictions with their probabilities
+        from tensorflow.keras.applications.resnet50 import decode_predictions
+        decoded = decode_predictions(predictions, top=5)[0]
+        return [(class_name, float(score)) for (_, class_name, score) in decoded]
     
     def _preprocess_image(self, image):
         """Preprocess image for ResNet50"""
@@ -36,15 +45,38 @@ class DeepLearningExtractor:
         return np.expand_dims(preprocessed, axis=0)
     
     def compute_similarity(self, image1, image2):
-        """Compute cosine similarity between features"""
+        """Compute cosine similarity between features with category matching bonus"""
         features1 = self.extract_features(image1)
         features2 = self.extract_features(image2)
-        similarity = cosine_similarity(features1, features2)[0][0]
-        return float(similarity), {
+        
+        # Feature similarity
+        feature_similarity = cosine_similarity(features1, features2)[0][0]
+        
+        # Category matching bonus
+        categories1 = self.classify_image(image1)
+        categories2 = self.classify_image(image2)
+        
+        # Check if top categories match
+        top_cats1 = set([cat for cat, _ in categories1[:3]])
+        top_cats2 = set([cat for cat, _ in categories2[:3]])
+        category_overlap = len(top_cats1.intersection(top_cats2))
+        
+        # Add bonus based on category overlap (0-15% boost)
+        category_bonus = category_overlap * 0.05  # 5% per matching category
+        
+        # Combine feature similarity with category bonus (capped at 1.0)
+        final_similarity = min(1.0, feature_similarity + category_bonus)
+        
+        return float(final_similarity), {
             'features1': features1.flatten().tolist(),
             'features2': features2.flatten().tolist(),
             'feature_distance': float(np.linalg.norm(features1 - features2)),
-            'feature_correlation': float(np.corrcoef(features1.flatten(), features2.flatten())[0, 1])
+            'feature_correlation': float(np.corrcoef(features1.flatten(), features2.flatten())[0, 1]),
+            'feature_similarity': float(feature_similarity),
+            'category_bonus': float(category_bonus),
+            'categories1': categories1,
+            'categories2': categories2,
+            'category_overlap': int(category_overlap)
         }
 
 class PerceptualHashExtractor:
@@ -89,24 +121,35 @@ class ComputerVisionExtractor:
     
     def compute_similarity(self, image1, image2):
         """Compute CV-based similarity"""
+        # Resize images to same dimensions if they differ
+        h1, w1 = image1.shape[:2]
+        h2, w2 = image2.shape[:2]
+
+        if h1 != h2 or w1 != w2:
+            # Use the larger dimensions to preserve more detail
+            target_h = max(h1, h2)
+            target_w = max(w1, w2)
+            image1 = cv2.resize(image1, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+            image2 = cv2.resize(image2, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+
         gray1 = cv2.cvtColor(image1, cv2.COLOR_RGB2GRAY)
         gray2 = cv2.cvtColor(image2, cv2.COLOR_RGB2GRAY)
         
-        # SSIM
+        # SSIM - now both images have same dimensions
         ssim_score = ssim(gray1, gray2)
         
-        # Histogram comparison
+        # Histogram comparison (doesn't require same dimensions, but we keep consistent sizes)
         hist1 = cv2.calcHist([image1], [0, 1, 2], None, [50, 50, 50], [0, 256, 0, 256, 0, 256])
         hist2 = cv2.calcHist([image2], [0, 1, 2], None, [50, 50, 50], [0, 256, 0, 256, 0, 256])
         hist_sim = cv2.compareHist(hist1, hist2, cv2.HISTCMP_CORREL)
         
-        # Edge detection
+        # Edge detection - now both images have same dimensions
         edges1 = cv2.Canny(gray1, 50, 150)
         edges2 = cv2.Canny(gray2, 50, 150)
         edge_sim = cv2.matchTemplate(edges1, edges2, cv2.TM_CCOEFF_NORMED)[0][0]
         edge_sim = max(0, edge_sim)
         
-        # LBP
+        # LBP - now both images have same dimensions
         lbp1 = local_binary_pattern(gray1, 8, 1, method='uniform')
         lbp2 = local_binary_pattern(gray2, 8, 1, method='uniform')
         lbp_hist1, _ = np.histogram(lbp1.ravel(), bins=10, range=(0, 10))
@@ -155,8 +198,9 @@ class ProbabilisticExtractor:
             'kl_similarity': float(kl_sim),
             'js_similarity': float(js_sim),
             'wasserstein_similarity': float(wasserstein_sim),
-            'gmm1': gmm1,  # Store actual fitted models
-            'gmm2': gmm2
+            'n_components': 3,
+            'gmm1_means_shape': list(gmm1.means_.shape),
+            'gmm2_means_shape': list(gmm2.means_.shape)
         }
     
     def _extract_features(self, image):

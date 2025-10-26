@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Similarity Analyzer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="title">
+                Image Similarity Analyzer
+            </h1>
+            <p class="subtitle">Upload two images to analyze their similarity using advanced AI and computer vision techniques</p>
+        </header>
+
+        <main class="main-content">
+            <!-- Upload Section -->
+            <section class="upload-section" id="uploadSection">
+                <div class="upload-container">
+                    <div class="upload-zone" id="uploadZone1">
+                        <div class="upload-content">
+                            <h3>Upload First Image</h3>
+                            <p>Drag & drop or click to select</p>
+                            <input type="file" id="image1" accept="image/*" hidden>
+                            <button class="upload-btn" onclick="document.getElementById('image1').click()">
+                                Choose Image
+                            </button>
+                        </div>
+                        <div class="image-preview" id="preview1" style="display: none;">
+                            <img id="img1" alt="Image 1">
+                            <button class="remove-btn" onclick="removeImage(1)">×</button>
+                        </div>
+                    </div>
+
+                    <div class="vs-divider">
+                        <span>VS</span>
+                    </div>
+
+                    <div class="upload-zone" id="uploadZone2">
+                        <div class="upload-content">
+                            <h3>Upload Second Image</h3>
+                            <p>Drag & drop or click to select</p>
+                            <input type="file" id="image2" accept="image/*" hidden>
+                            <button class="upload-btn" onclick="document.getElementById('image2').click()">
+                                Choose Image
+                            </button>
+                        </div>
+                        <div class="image-preview" id="preview2" style="display: none;">
+                            <img id="img2" alt="Image 2">
+                            <button class="remove-btn" onclick="removeImage(2)">×</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="analyze-section">
+                    <button class="analyze-btn" id="analyzeBtn" onclick="analyzeImages()" disabled>
+                        <span class="btn-text">Analyze Similarity</span>
+                        <span class="btn-loader" style="display: none;">⏳</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Loading Section -->
+            <section class="loading-section" id="loadingSection" style="display: none;">
+                <div class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <h3>Analyzing Images...</h3>
+                    <p>Computing similarity using multiple AI techniques</p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <div class="results-header">
+                    <h2>Similarity Analysis Results</h2>
+                    <button class="new-analysis-btn" onclick="resetAnalysis()">New Analysis</button>
+                </div>
+
+                <!-- Main Results -->
+                <div class="main-results" id="mainResults">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+
+                <!-- Detailed Analysis Tabs -->
+                <div class="analysis-tabs">
+                    <div class="tab-buttons">
+                        <button class="tab-btn active" onclick="showTab('overview')">Overview</button>
+                        <button class="tab-btn" onclick="showTab('methods')">Method Details</button>
+                        <button class="tab-btn" onclick="showTab('comparison')">Image Comparison</button>
+                        <button class="tab-btn" onclick="showTab('statistics')">Statistics</button>
+                        <button class="tab-btn" onclick="showTab('confidence')">Confidence</button>
+                    </div>
+
+                    <div class="tab-content">
+                        <div class="tab-panel active" id="overview">
+                            <div class="visualization-container" id="overviewViz">
+                                <!-- Overview visualization will be loaded here -->
+                            </div>
+                        </div>
+
+                        <div class="tab-panel" id="methods">
+                            <div class="visualization-container" id="methodsViz">
+                                <!-- Method comparison visualization will be loaded here -->
+                            </div>
+                        </div>
+
+                        <div class="tab-panel" id="comparison">
+                            <div class="visualization-container" id="comparisonViz">
+                                <!-- Side-by-side comparison will be loaded here -->
+                            </div>
+                        </div>
+
+                        <div class="tab-panel" id="statistics">
+                            <div class="visualization-container" id="statisticsViz">
+                                <!-- Statistical breakdown will be loaded here -->
+                            </div>
+                        </div>
+
+                        <div class="tab-panel" id="confidence">
+                            <div class="visualization-container" id="confidenceViz">
+                                <!-- Confidence analysis will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>Deep Learning, Computer Vision, and Probabilistic Analysis</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
+

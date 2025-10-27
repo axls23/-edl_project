@@ -94,7 +94,7 @@ A modular, efficient web application that computes image similarity using an ens
 
 **Note**: The application uses `similarity_engine_v2.py` for modular, maintainable similarity computation with enhanced semantic understanding through category detection.
 
-1. Deep Learning (50% weight)
+### 1. Deep Learning (50% weight)
 
 **What:** ResNet50 extracts 2048-dimensional feature vectors + ImageNet classification
 
@@ -140,14 +140,14 @@ A modular, efficient web application that computes image similarity using an ens
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/coeusyk/edl_project.git
+   git clone https://github.com/axls23/-edl_project.git
    cd edl_project
    ```
 
 2. **Create virtual environment**
    ```bash
    python -m venv .venv
-   source venv/bin/activate  # On Windows: .venv\Scripts\activate
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
 3. **Install dependencies**

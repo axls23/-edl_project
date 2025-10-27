@@ -22,12 +22,13 @@ class SimilarityEngineV2:
         self.probabilistic = ProbabilisticExtractor()
         self.report_generator = ReportGenerator()
         
-        # Ensemble weights
+        # Ensemble weights - prioritizing semantic similarity
+        # Deep learning gets highest weight as it understands content semantically
         self.weights = {
-            'deep_learning': 0.35,
-            'perceptual_hash': 0.20,
-            'cv_methods': 0.25,
-            'probabilistic': 0.20
+            'deep_learning': 0.50,      # Increased: Best for semantic understanding
+            'cv_methods': 0.25,         # Maintained: Good for structural similarity
+            'probabilistic': 0.10,      # Decreased: Supporting role
+            'perceptual_hash': 0.15     # Decreased: Best for near-duplicates only
         }
     
     def compute_similarity(self, image1, image2):
@@ -38,11 +39,19 @@ class SimilarityEngineV2:
         try:
             # 1. Deep Learning Analysis
             dl_score, dl_details = self.deep_learning.compute_similarity(image1, image2)
+            
+            # Build detailed proof string with category information
+            category_info = ""
+            if 'categories1' in dl_details and 'categories2' in dl_details:
+                cat1_top = dl_details['categories1'][0][0] if dl_details['categories1'] else 'unknown'
+                cat2_top = dl_details['categories2'][0][0] if dl_details['categories2'] else 'unknown'
+                category_info = f" | Categories: {cat1_top} vs {cat2_top} (overlap: {dl_details.get('category_overlap', 0)})"
+            
             results['deep_learning'] = {
                 'score': dl_score,
                 'details': dl_details,
-                'method': 'ResNet50 Feature Extraction + Cosine Similarity',
-                'proof': f"Feature vectors dimension: {len(dl_details.get('features1', []))}",
+                'method': 'ResNet50 Feature Extraction + Category Matching',
+                'proof': f"Feature similarity: {dl_details.get('feature_similarity', dl_score):.4f} + Category bonus: {dl_details.get('category_bonus', 0):.4f}{category_info}",
                 'confidence': self._calculate_confidence(dl_score)
             }
             
@@ -82,7 +91,7 @@ class SimilarityEngineV2:
             results['ensemble'] = {
                 'score': ensemble_score,
                 'confidence': ensemble_confidence,
-                'method': 'Weighted Ensemble (35% DL + 20% PH + 25% CV + 20% Prob)',
+                'method': 'Semantic-Weighted Ensemble (50% DL + 25% CV + 10% Prob + 15% PH)',
                 'proof': f"Final score: {ensemble_score:.4f} with confidence: {ensemble_confidence:.4f}",
                 'statistical_significance': self._calculate_statistical_significance(results)
             }

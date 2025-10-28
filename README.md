@@ -64,10 +64,11 @@ A modular, efficient web application that computes image similarity using an ens
 - Thread-safe matplotlib rendering with Agg backend (fixes tkinter issues on Windows)
 
 ### **Modern User Interface**
-- Drag-and-drop image upload with red-gold theme
-- Responsive design with smooth animations
-- Tabbed interface for detailed analysis
-- Real-time preview and progress indicators
+- Polished dark theme by default (inspired by v0.app)
+- Optional light mode via in-app toggle (persists across sessions)
+- Drag-and-drop uploads with clear previews and actions
+- Responsive layout, subtle glass surfaces, and smooth animations
+- Tabbed interface for detailed analysis and SVG/PNG visualizations
 
 ## 🏗️ **Modular Architecture**
 
@@ -84,7 +85,7 @@ A modular, efficient web application that computes image similarity using an ens
 │   ├── feature_extractors.py   # Deep learning, CV, hash extractors with category detection
 │   └── report_generator.py     # Comprehensive reporting
 ├── static/
-│   ├── css/style.css          # Red-gold theme styling
+│   ├── css/style.css          # Dark theme styling with design tokens + light mode
 │   ├── js/app.js              # Frontend logic
 │   └── uploads/               # Temporary storage
 ├── templates/
@@ -162,7 +163,8 @@ A modular, efficient web application that computes image similarity using an ens
    ```
 
 5. **Open in browser**
-   Navigate to `http://localhost:5000`
+  Navigate to `http://localhost:5000`
+  - Use the top-right toggle to switch between Dark/Light themes
 
 ## Usage
 

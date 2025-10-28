@@ -89,12 +89,7 @@ class ImageSimilarityApp {
         const analyzeBtn = document.getElementById('analyzeBtn');
         const canAnalyze = this.image1 && this.image2;
         analyzeBtn.disabled = !canAnalyze;
-        
-        if (canAnalyze) {
-            analyzeBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
-        } else {
-            analyzeBtn.style.background = '#ccc';
-        }
+        analyzeBtn.classList.toggle('ready', !!canAnalyze);
     }
 
     async analyzeImages() {
@@ -102,7 +97,7 @@ class ImageSimilarityApp {
             alert('Please upload both images before analyzing.');
             return;
         }
-
+        addLoadingAnimation();
         this.showLoading();
         this.simulateProgress();
 
@@ -133,6 +128,8 @@ class ImageSimilarityApp {
             console.error('Analysis error:', error);
             alert(`Analysis failed: ${error.message}`);
             this.hideLoading();
+        } finally {
+            removeLoadingAnimation();
         }
     }
 
@@ -161,8 +158,9 @@ class ImageSimilarityApp {
 
     displayResults() {
         this.hideLoading();
-        document.getElementById('resultsSection').style.display = 'block';
-        document.getElementById('resultsSection').classList.add('fade-in');
+        const resultsSection = document.getElementById('resultsSection');
+        resultsSection.style.display = 'block';
+        resultsSection.classList.add('fade-in');
 
         this.displayMainResults();
         this.loadVisualizations();
@@ -288,6 +286,7 @@ function resetAnalysis() {
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.imageSimilarityApp = new ImageSimilarityApp();
+    initThemeToggle();
 });
 
 // Add some utility functions for enhanced UX
@@ -345,5 +344,32 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+// Theme toggle (dark/light)
+function initThemeToggle() {
+    const root = document.documentElement;
+    const btn = document.getElementById('themeToggle');
+    const saved = localStorage.getItem('theme') || 'dark';
+    applyTheme(saved);
+
+    if (btn) {
+        btn.addEventListener('click', () => {
+            const current = (localStorage.getItem('theme') || 'dark');
+            const next = current === 'dark' ? 'light' : 'dark';
+            applyTheme(next);
+            localStorage.setItem('theme', next);
+        });
+    }
+
+    function applyTheme(mode) {
+        if (mode === 'light') {
+            root.setAttribute('data-theme', 'light');
+            if (btn) btn.textContent = '☀️ Light';
+        } else {
+            root.removeAttribute('data-theme');
+            if (btn) btn.textContent = '🌙 Dark';
+        }
+    }
+}
 
 

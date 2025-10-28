@@ -97,13 +97,12 @@ class VisualizationGenerator:
             methods = []
             scores = []
             colors = ['#dc2626', '#f59e0b', '#ef4444', '#f97316']
-            
-            # Use correct weights matching similarity_engine_v2.py
+
             weight_map = {
                 'deep_learning': 0.50,
                 'cv_methods': 0.25, 
-                'probabilistic': 0.10,      # CORRECTED: was 0.15
-                'perceptual_hash': 0.15     # CORRECTED: was 0.10
+                'probabilistic': 0.10,
+                'perceptual_hash': 0.15
             }
             
             for method_key in ['deep_learning', 'perceptual_hash', 'cv_methods', 'probabilistic']:
@@ -277,12 +276,11 @@ class VisualizationGenerator:
             scores = []
             weights = []
             
-            # Use correct weights matching similarity_engine_v2.py
             weight_map = {
                 'deep_learning': 0.50,
                 'cv_methods': 0.25,
-                'probabilistic': 0.10,      # CORRECTED: was 0.15
-                'perceptual_hash': 0.15     # CORRECTED: was 0.10
+                'probabilistic': 0.10,
+                'perceptual_hash': 0.15
             }
             
             for method_key in ['deep_learning', 'perceptual_hash', 'cv_methods', 'probabilistic']:
@@ -438,4 +436,3 @@ class VisualizationGenerator:
             print(f"Figure to base64 conversion error: {e}")
             plt.close('all')  # Close all figures on error
             return None
-

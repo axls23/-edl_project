@@ -5,15 +5,16 @@ import numpy as np
 from datetime import datetime
 import json
 
+
 class ReportGenerator:
     """Generate comprehensive analysis reports"""
     
     def __init__(self):
         self.weights = {
-            'deep_learning': 0.35,
-            'perceptual_hash': 0.20,
+            'deep_learning': 0.50,
+            'perceptual_hash': 0.15,
             'cv_methods': 0.25,
-            'probabilistic': 0.20
+            'probabilistic': 0.10
         }
         # Configurable thresholds instead of hardcoded values
         self.thresholds = {
@@ -27,7 +28,7 @@ class ReportGenerator:
         }
     
     def generate_analysis_report(self, results, timestamp=None):
-        """Generate comprehensive analysis report"""
+        """Generate a comprehensive analysis report"""
         if timestamp is None:
             timestamp = datetime.now().isoformat()
         
@@ -41,9 +42,10 @@ class ReportGenerator:
         }
         
         return report
-    
-    def _generate_summary(self, results):
-        """Generate summary section"""
+
+    @staticmethod
+    def _generate_summary(results):
+        """Generate a summary section"""
         ensemble = results.get('ensemble', {})
         return {
             'ensemble_score': ensemble.get('score', 0),
@@ -145,8 +147,9 @@ class ReportGenerator:
             'outlier_analysis': self._detect_outliers(scores),
             'correlation_analysis': self._correlation_analysis(results)
         }
-    
-    def _calculate_consistency(self, scores):
+
+    @staticmethod
+    def _calculate_consistency(scores):
         """Calculate consistency across methods"""
         if len(scores) < 2:
             return 0.0
@@ -155,8 +158,9 @@ class ReportGenerator:
         std_score = np.std(scores)
         cv = std_score / (mean_score + 1e-10)
         return max(0, min(1, 1 - cv))
-    
-    def _calculate_skewness(self, scores):
+
+    @staticmethod
+    def _calculate_skewness(scores):
         """Calculate skewness of scores"""
         if len(scores) < 3:
             return 0.0
@@ -165,8 +169,9 @@ class ReportGenerator:
         std_score = np.std(scores)
         skewness = np.mean([(x - mean_score) ** 3 for x in scores]) / (std_score ** 3)
         return skewness
-    
-    def _calculate_kurtosis(self, scores):
+
+    @staticmethod
+    def _calculate_kurtosis(scores):
         """Calculate kurtosis of scores"""
         if len(scores) < 4:
             return 0.0
@@ -175,8 +180,9 @@ class ReportGenerator:
         std_score = np.std(scores)
         kurtosis = np.mean([(x - mean_score) ** 4 for x in scores]) / (std_score ** 4) - 3
         return kurtosis
-    
-    def _detect_outliers(self, scores):
+
+    @staticmethod
+    def _detect_outliers(scores):
         """Detect outliers in scores"""
         if len(scores) < 3:
             return {'outliers': [], 'outlier_count': 0}
@@ -231,8 +237,9 @@ class ReportGenerator:
             return self._format_text_report(report)
         else:
             return str(report)
-    
-    def _format_text_report(self, report):
+
+    @staticmethod
+    def _format_text_report(report):
         """Format report as text"""
         text = f"""
 IMAGE SIMILARITY ANALYSIS REPORT

@@ -11,6 +11,7 @@ from modules.feature_extractors import (
 )
 from modules.report_generator import ReportGenerator
 
+
 class SimilarityEngineV2:
     """Simplified similarity engine using modular components"""
     
@@ -23,7 +24,7 @@ class SimilarityEngineV2:
         self.report_generator = ReportGenerator()
         
         # Ensemble weights - prioritizing semantic similarity
-        # Deep learning gets highest weight as it understands content semantically
+        # Deep learning gets the highest weight as it understands content semantically
         self.weights = {
             'deep_learning': 0.50,      # Increased: Best for semantic understanding
             'cv_methods': 0.25,         # Maintained: Good for structural similarity
@@ -95,8 +96,7 @@ class SimilarityEngineV2:
                 'proof': f"Final score: {ensemble_score:.4f} with confidence: {ensemble_confidence:.4f}",
                 'statistical_significance': self._calculate_statistical_significance(results)
             }
-            
-            
+
             # 7. Generate Analysis Report
             results['analysis_report'] = self.report_generator.generate_analysis_report(results, timestamp)
             results['timestamp'] = timestamp

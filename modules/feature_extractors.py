@@ -7,12 +7,14 @@ from skimage.feature import local_binary_pattern
 from skimage.metrics import structural_similarity as ssim
 import imagehash
 from PIL import Image
-from tensorflow.keras.applications import ResNet50
-from tensorflow.keras.applications.resnet50 import preprocess_input
+from keras.applications import ResNet50
+from keras.applications.resnet50 import preprocess_input, decode_predictions
 from sklearn.mixture import GaussianMixture
 from sklearn.metrics.pairwise import cosine_similarity
 import warnings
+
 warnings.filterwarnings('ignore')
+
 
 class DeepLearningExtractor:
     """Deep learning feature extraction using pre-trained models"""
@@ -34,11 +36,11 @@ class DeepLearningExtractor:
         processed = self._preprocess_image(image)
         predictions = self.classification_model.predict(processed, verbose=0)
         # Get top 5 predictions with their probabilities
-        from tensorflow.keras.applications.resnet50 import decode_predictions
         decoded = decode_predictions(predictions, top=5)[0]
         return [(class_name, float(score)) for (_, class_name, score) in decoded]
-    
-    def _preprocess_image(self, image):
+
+    @staticmethod
+    def _preprocess_image(image):
         """Preprocess image for ResNet50"""
         resized = cv2.resize(image, (224, 224))
         preprocessed = preprocess_input(resized)
@@ -79,10 +81,12 @@ class DeepLearningExtractor:
             'category_overlap': int(category_overlap)
         }
 
+
 class PerceptualHashExtractor:
     """Perceptual hashing using imagehash library"""
-    
-    def compute_similarity(self, image1, image2):
+
+    @staticmethod
+    def compute_similarity(image1, image2):
         """Compute perceptual hash similarity"""
         pil_img1 = Image.fromarray(image1)
         pil_img2 = Image.fromarray(image2)
@@ -116,10 +120,12 @@ class PerceptualHashExtractor:
             'ahash_similarity': float(ahash_sim)
         }
 
+
 class ComputerVisionExtractor:
     """Computer vision methods using OpenCV and scikit-image"""
-    
-    def compute_similarity(self, image1, image2):
+
+    @staticmethod
+    def compute_similarity(image1, image2):
         """Compute CV-based similarity"""
         # Resize images to same dimensions if they differ
         h1, w1 = image1.shape[:2]
@@ -165,6 +171,7 @@ class ComputerVisionExtractor:
             'lbp_similarity': float(lbp_sim)
         }
 
+
 class ProbabilisticExtractor:
     """Probabilistic analysis using scikit-learn GMM"""
     
@@ -202,8 +209,9 @@ class ProbabilisticExtractor:
             'gmm1_means_shape': list(gmm1.means_.shape),
             'gmm2_means_shape': list(gmm2.means_.shape)
         }
-    
-    def _extract_features(self, image):
+
+    @staticmethod
+    def _extract_features(image):
         """Extract features for GMM"""
         color_features = image.reshape(-1, 3)
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
@@ -215,8 +223,9 @@ class ProbabilisticExtractor:
             indices = np.random.choice(len(features), 10000, replace=False)
             features = features[indices]
         return features
-    
-    def _kl_divergence(self, gmm1, gmm2):
+
+    @staticmethod
+    def _kl_divergence(gmm1, gmm2):
         """Calculate KL divergence using Monte Carlo estimation with more samples for accuracy"""
         # Use more samples for better accuracy
         samples = gmm1.sample(5000)[0]
@@ -225,8 +234,9 @@ class ProbabilisticExtractor:
         # KL divergence: E[log(p1/p2)] = E[log(p1) - log(p2)]
         kl_div = np.mean(log_prob1 - log_prob2)
         return max(0, kl_div)  # KL divergence is always non-negative
-    
-    def _jensen_shannon_divergence(self, gmm1, gmm2):
+
+    @staticmethod
+    def _jensen_shannon_divergence(gmm1, gmm2):
         """Calculate Jensen-Shannon divergence using more samples for accuracy"""
         # Use more samples for better accuracy
         samples1 = gmm1.sample(5000)[0]
@@ -243,8 +253,9 @@ class ProbabilisticExtractor:
         
         js_div = 0.5 * (np.mean(log_prob1_gmm1 - m1) + np.mean(log_prob2_gmm2 - m2))
         return max(0, js_div)  # JS divergence is always non-negative
-    
-    def _wasserstein_distance(self, gmm1, gmm2):
+
+    @staticmethod
+    def _wasserstein_distance(gmm1, gmm2):
         """Calculate Wasserstein distance using optimal transport between GMM components"""
         means1 = gmm1.means_
         means2 = gmm2.means_

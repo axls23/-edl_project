@@ -1,5 +1,6 @@
 # Image Similarity Analyzer
 
+
 A modular, efficient web application that computes image similarity using an ensemble of deep learning, computer vision, and probabilistic methods. Built with reusable components and existing libraries to minimize code duplication.
 
 ## Table of Contents

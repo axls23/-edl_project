@@ -8,6 +8,10 @@ import cv2
 import base64
 from io import BytesIO
 from utils import format_percentage
+from skimage.metrics import structural_similarity as ssim
+from skimage import img_as_float
+from modules.feature_extractors import DeepLearningExtractor
+from sklearn.manifold import TSNE
 
 class VisualizationGenerator:
     def __init__(self):
@@ -91,6 +95,26 @@ class VisualizationGenerator:
             
             # 5. Confidence visualization
             visualizations['confidence'] = self._create_confidence_visualization(results)
+
+            # 6. SSIM heatmap overlay
+            visualizations['ssim_heatmap'] = self._create_ssim_heatmap(image1, image2)
+
+            # 7. Edge and LBP difference maps
+            visualizations['edge_lbp_diffs'] = self._create_edge_lbp_diffs(image1, image2)
+
+            # 8. Method attribution (score x weight)
+            visualizations['method_attribution'] = self._create_method_attribution(results)
+
+            # 9. RGB histogram overlay with correlations
+            visualizations['hist_overlay'] = self._create_hist_overlay(image1, image2)
+
+            # 10. Feature-space t-SNE (lightweight using color+LBP features)
+            visualizations['tsne_features'] = self._create_tsne_features(image1, image2)
+
+            # 11. Grad-CAM overlays (best-effort; may return None if TF ops unavailable)
+            gradcam_img = self._create_gradcam_overlays(image1, image2)
+            if gradcam_img is not None:
+                visualizations['gradcam_overlays'] = gradcam_img
             
             return visualizations
             
@@ -414,6 +438,211 @@ class VisualizationGenerator:
             
         except Exception as e:
             print(f"Detailed breakdown error: {e}")
+            return None
+
+    def _create_method_attribution(self, results):
+        """Bar chart of score x weight contributions and simple agreement index."""
+        try:
+            fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+            fig.patch.set_facecolor(self.palette['bg'])
+            self._style_axes(ax)
+
+            weight_map = {
+                'deep_learning': 0.50,
+                'cv_methods': 0.25,
+                'probabilistic': 0.10,
+                'perceptual_hash': 0.15
+            }
+            methods = []
+            contributions = []
+            for m in ['deep_learning', 'perceptual_hash', 'cv_methods', 'probabilistic']:
+                if m in results:
+                    s = results[m].get('score', 0)
+                    w = weight_map.get(m, 0)
+                    methods.append(m.replace('_',' ').title())
+                    contributions.append(s * w)
+
+            bars = ax.bar(methods, contributions, color=[self.palette['accent'], self.palette['accent2'], self.palette['accent_soft'], self.palette['accent2_soft']][:len(methods)], edgecolor=self.palette['border'])
+            ax.set_title('Method Attribution (Score × Weight)', fontsize=14, fontweight='bold', pad=20)
+            ax.set_ylabel('Contribution')
+            ax.set_ylim(0, 1.0)
+            for b, c in zip(bars, contributions):
+                ax.text(b.get_x()+b.get_width()/2., c + 0.02, f"{c:.3f}", ha='center', va='bottom', fontsize=10, color=self.palette['text'])
+
+            # Agreement index
+            scores = [results[m]['score'] for m in ['deep_learning','perceptual_hash','cv_methods','probabilistic'] if m in results]
+            if len(scores) >= 2:
+                agreement = max(0.0, min(1.0, 1 - float(np.std(scores))))
+                ax.text(0.95, 0.95, f"Agreement: {agreement:.2f}", transform=ax.transAxes, ha='right', va='top', fontsize=11, color=self.palette['text'], bbox=dict(boxstyle="round,pad=0.3", facecolor=self.palette['surface2'], edgecolor=self.palette['ring']))
+
+            plt.tight_layout()
+            return self._fig_to_base64(fig)
+        except Exception as e:
+            print(f"Attribution visualization error: {e}")
+            return None
+
+    def _create_ssim_heatmap(self, image1, image2):
+        """Generate SSIM heatmap (hot=diff, cool=same)."""
+        try:
+            # Ensure same size
+            h1, w1 = image1.shape[:2]
+            h2, w2 = image2.shape[:2]
+            if (h1, w1) != (h2, w2):
+                H, W = max(h1, h2), max(w1, w2)
+                img1 = cv2.resize(image1, (W, H), interpolation=cv2.INTER_LINEAR)
+                img2 = cv2.resize(image2, (W, H), interpolation=cv2.INTER_LINEAR)
+            else:
+                img1, img2 = image1, image2
+
+            gray1 = cv2.cvtColor(img1, cv2.COLOR_RGB2GRAY)
+            gray2 = cv2.cvtColor(img2, cv2.COLOR_RGB2GRAY)
+            gray1 = img_as_float(gray1)
+            gray2 = img_as_float(gray2)
+            # Explicit args for newer scikit-image: set channel_axis=None and data_range
+            score, diff = ssim(gray1, gray2, full=True, data_range=1.0, channel_axis=None)
+            diff = (1 - diff)  # now high = more different
+
+            fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+            fig.patch.set_facecolor(self.palette['bg'])
+            ax.imshow(diff, cmap='inferno')
+            ax.axis('off')
+            ax.set_title(f'SSIM Difference Heatmap (score={score:.3f})', fontsize=14, fontweight='bold')
+            plt.tight_layout()
+            return self._fig_to_base64(fig)
+        except Exception as e:
+            print(f"SSIM heatmap error: {e}")
+            return None
+
+    def _create_edge_lbp_diffs(self, image1, image2):
+        """Edge and LBP difference maps side-by-side."""
+        try:
+            # Resize to same size
+            h1, w1 = image1.shape[:2]
+            h2, w2 = image2.shape[:2]
+            H, W = max(h1, h2), max(w1, w2)
+            img1 = cv2.resize(image1, (W, H), interpolation=cv2.INTER_LINEAR)
+            img2 = cv2.resize(image2, (W, H), interpolation=cv2.INTER_LINEAR)
+
+            g1 = cv2.cvtColor(img1, cv2.COLOR_RGB2GRAY)
+            g2 = cv2.cvtColor(img2, cv2.COLOR_RGB2GRAY)
+            e1 = cv2.Canny(g1, 50, 150)
+            e2 = cv2.Canny(g2, 50, 150)
+            ediff = cv2.absdiff(e1, e2)
+
+            from skimage.feature import local_binary_pattern
+            lbp1 = local_binary_pattern(g1, 8, 1, method='uniform')
+            lbp2 = local_binary_pattern(g2, 8, 1, method='uniform')
+            ldiff = np.abs(lbp1 - lbp2)
+
+            fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+            fig.patch.set_facecolor(self.palette['bg'])
+            for ax in axes:
+                ax.set_facecolor(self.palette['surface'])
+                ax.axis('off')
+            axes[0].imshow(ediff, cmap='magma')
+            axes[0].set_title('Edge Difference', fontsize=14, fontweight='bold')
+            im = axes[1].imshow(ldiff, cmap='viridis')
+            axes[1].set_title('LBP Difference', fontsize=14, fontweight='bold')
+            plt.tight_layout()
+            return self._fig_to_base64(fig)
+        except Exception as e:
+            print(f"Edge/LBP diff error: {e}")
+            return None
+
+    def _create_hist_overlay(self, image1, image2):
+        """Overlay RGB histograms and show per-channel correlation."""
+        try:
+            fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+            fig.patch.set_facecolor(self.palette['bg'])
+            self._style_axes(ax)
+
+            colors = ['r','g','b']
+            corr_texts = []
+            for i, c in enumerate(colors):
+                h1 = cv2.calcHist([image1],[i],None,[256],[0,256]).flatten()
+                h2 = cv2.calcHist([image2],[i],None,[256],[0,256]).flatten()
+                h1 /= (np.sum(h1) + 1e-10)
+                h2 /= (np.sum(h2) + 1e-10)
+                ax.plot(h1, color=c, alpha=0.7, label=f'Img1-{c.upper()}')
+                ax.plot(h2, color=c, alpha=0.7, linestyle='--', label=f'Img2-{c.upper()}')
+                # correlation
+                num = np.sum(h1*h2)
+                den = np.sqrt(np.sum(h1*h1) * np.sum(h2*h2)) + 1e-10
+                corr = float(num/den)
+                corr_texts.append(f'{c.upper()}={corr:.2f}')
+
+            ax.set_title('RGB Histogram Overlay  (corr: ' + ', '.join(corr_texts) + ')', fontsize=14, fontweight='bold')
+            ax.legend(fontsize=9)
+            plt.tight_layout()
+            return self._fig_to_base64(fig)
+        except Exception as e:
+            print(f"Histogram overlay error: {e}")
+            return None
+
+    def _create_tsne_features(self, image1, image2):
+        """t-SNE of lightweight color+LBP features for both images."""
+        try:
+            # Build features similar to ProbabilisticExtractor
+            def build_features(img):
+                g = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+                from skimage.feature import local_binary_pattern
+                lbp = local_binary_pattern(g, 8, 1, method='uniform').reshape(-1,1)
+                cols = img.reshape(-1,3)
+                feats = np.column_stack([cols, lbp])
+                if len(feats) > 4000:
+                    idx = np.random.choice(len(feats), 4000, replace=False)
+                    feats = feats[idx]
+                return feats
+
+            f1 = build_features(image1)
+            f2 = build_features(image2)
+            X = np.vstack([f1, f2]).astype(np.float32)
+            labels = np.array([0]*len(f1) + [1]*len(f2))
+
+            tsne = TSNE(n_components=2, perplexity=30, learning_rate='auto', init='random', n_iter=500, random_state=42)
+            Y = tsne.fit_transform(X)
+
+            fig, ax = plt.subplots(1,1, figsize=(7,6))
+            fig.patch.set_facecolor(self.palette['bg'])
+            ax.scatter(Y[labels==0,0], Y[labels==0,1], s=5, c=self.palette['accent'], alpha=0.6, label='Image 1')
+            ax.scatter(Y[labels==1,0], Y[labels==1,1], s=5, c=self.palette['accent2'], alpha=0.6, label='Image 2')
+            ax.set_title('Feature-space (t-SNE)')
+            ax.legend()
+            ax.set_xticks([]); ax.set_yticks([])
+            plt.tight_layout()
+            return self._fig_to_base64(fig)
+        except Exception as e:
+            print(f"t-SNE error: {e}")
+            return None
+
+    def _create_gradcam_overlays(self, image1, image2):
+        """Generate Grad-CAM overlays for both images. Best-effort; may return None."""
+        try:
+            extractor = DeepLearningExtractor()
+            heat1 = extractor.gradcam_heatmap(image1)
+            heat2 = extractor.gradcam_heatmap(image2)
+            if heat1 is None or heat2 is None:
+                return None
+
+            def overlay(img, heat):
+                heatmap = (heat * 255).astype(np.uint8)
+                heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+                overlayed = cv2.addWeighted(cv2.cvtColor(img, cv2.COLOR_RGB2BGR), 0.6, heatmap, 0.4, 0)
+                return cv2.cvtColor(overlayed, cv2.COLOR_BGR2RGB)
+
+            o1 = overlay(image1, heat1)
+            o2 = overlay(image2, heat2)
+
+            fig, axes = plt.subplots(1,2, figsize=(12,5))
+            fig.patch.set_facecolor(self.palette['bg'])
+            for ax in axes:
+                ax.axis('off')
+            axes[0].imshow(o1); axes[0].set_title('Grad-CAM Image 1', fontsize=12, fontweight='bold')
+            axes[1].imshow(o2); axes[1].set_title('Grad-CAM Image 2', fontsize=12, fontweight='bold')
+            plt.tight_layout()
+            return self._fig_to_base64(fig)
+        except Exception as e:
+            print(f"Grad-CAM error: {e}")
             return None
     
     def _create_confidence_visualization(self, results):

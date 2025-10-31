@@ -101,6 +101,8 @@
                         <button class="tab-btn" onclick="showTab('comparison')">Image Comparison</button>
                         <button class="tab-btn" onclick="showTab('statistics')">Statistics</button>
                         <button class="tab-btn" onclick="showTab('confidence')">Confidence</button>
+                        <button class="tab-btn" onclick="showTab('insights')">Insights</button>
+                        <button class="tab-btn" onclick="showTab('diagnostics')">Diagnostics</button>
                     </div>
 
                     <div class="tab-content">
@@ -131,6 +133,18 @@
                         <div class="tab-panel" id="confidence">
                             <div class="visualization-container" id="confidenceViz">
                                 <!-- Confidence analysis will be loaded here -->
+                            </div>
+                        </div>
+
+                        <div class="tab-panel" id="insights">
+                            <div class="visualization-container" id="insightsPanel">
+                                <!-- Text-first insights will be rendered here -->
+                            </div>
+                        </div>
+
+                        <div class="tab-panel" id="diagnostics">
+                            <div class="visualization-container" id="diagnosticsViz">
+                                <!-- Diagnostics visualizations will be loaded here -->
                             </div>
                         </div>
                     </div>

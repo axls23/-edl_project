@@ -11,6 +11,9 @@ from keras.applications import ResNet50
 from keras.applications.resnet50 import preprocess_input, decode_predictions
 from sklearn.mixture import GaussianMixture
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.manifold import TSNE
+import tensorflow as tf
+from keras import Model
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -38,6 +41,47 @@ class DeepLearningExtractor:
         # Get top 5 predictions with their probabilities
         decoded = decode_predictions(predictions, top=5)[0]
         return [(class_name, float(score)) for (_, class_name, score) in decoded]
+
+    def gradcam_heatmap(self, image, class_index=None):
+        """Generate Grad-CAM heatmap for the top predicted class or provided class_index.
+        Returns a float32 heatmap in range [0,1] same HxW as input image (after resizing back).
+        """
+        try:
+            # Prepare image
+            resized = cv2.resize(image, (224, 224))
+            x = np.expand_dims(preprocess_input(resized.astype(np.float32)), axis=0)
+
+            # Predict class if not provided
+            preds = self.classification_model.predict(x, verbose=0)
+            if class_index is None:
+                class_index = int(np.argmax(preds[0]))
+
+            # Target layer for ResNet50
+            last_conv_layer = self.classification_model.get_layer('conv5_block3_out')
+            grad_model = Model(
+                [self.classification_model.inputs],
+                [last_conv_layer.output, self.classification_model.output]
+            )
+
+            with tf.GradientTape() as tape:
+                conv_outputs, predictions = grad_model(x)
+                loss = predictions[:, class_index]
+
+            grads = tape.gradient(loss, conv_outputs)
+            pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+            conv_outputs = conv_outputs[0]
+            heatmap = tf.reduce_sum(tf.multiply(pooled_grads, conv_outputs), axis=-1)
+
+            heatmap = np.maximum(heatmap.numpy(), 0)
+            if np.max(heatmap) > 0:
+                heatmap /= np.max(heatmap)
+
+            # Resize to input size
+            heatmap = cv2.resize(heatmap.astype(np.float32), (image.shape[1], image.shape[0]))
+            return heatmap.astype(np.float32)
+        except Exception:
+            # Fail gracefully; return None to skip Grad-CAM
+            return None
 
     @staticmethod
     def _preprocess_image(image):

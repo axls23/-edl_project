@@ -164,6 +164,8 @@ class ImageSimilarityApp {
 
         this.displayMainResults();
         this.loadVisualizations();
+        this.renderInsightsPanel();
+        this.loadDiagnostics();
     }
 
     displayMainResults() {
@@ -211,6 +213,82 @@ class ImageSimilarityApp {
             document.getElementById('confidenceViz').innerHTML = 
                 `<img src="${visualizations.confidence}" alt="Confidence Analysis">`;
         }
+    }
+
+    renderInsightsPanel() {
+        const panel = document.getElementById('insightsPanel');
+        if (!panel || !this.results) return;
+
+        const ensemble = this.results.results?.ensemble || {};
+        const report = this.results.results?.analysis_report || {};
+        const dl = this.results.results?.deep_learning || {};
+        const dld = dl.details || {};
+
+        const score = ensemble.score ?? 0;
+        const confidence = ensemble.confidence ?? 0;
+
+        const level = score >= 0.8 ? 'High' : score >= 0.6 ? 'Medium' : score >= 0.4 ? 'Low' : 'Very Low';
+        const confLevel = confidence >= 0.8 ? 'High' : confidence >= 0.5 ? 'Medium' : 'Low';
+
+        const cats1 = (dld.categories1 || []).slice(0,3).map(([c,p]) => `${c} (${(p*100).toFixed(1)}%)`).join(', ') || '—';
+        const cats2 = (dld.categories2 || []).slice(0,3).map(([c,p]) => `${c} (${(p*100).toFixed(1)}%)`).join(', ') || '—';
+        const overlap = dld.category_overlap ?? 0;
+
+        const recs = (report.recommendations || []).slice(0,2);
+
+        const weightMap = { deep_learning: 0.50, cv_methods: 0.25, probabilistic: 0.10, perceptual_hash: 0.15 };
+        const methods = ['deep_learning','cv_methods','probabilistic','perceptual_hash'];
+        let dominantMethod = '—';
+        let maxContribution = -1;
+        methods.forEach(m => {
+            const s = this.results.results?.[m]?.score;
+            if (typeof s === 'number') {
+                const contrib = s * (weightMap[m] || 0);
+                if (contrib > maxContribution) { maxContribution = contrib; dominantMethod = m.replace('_',' '); }
+            }
+        });
+
+        panel.innerHTML = `
+            <div class="insights">
+                <div class="badges">
+                    <span class="badge">Similarity: ${level}</span>
+                    <span class="badge">Confidence: ${confLevel}</span>
+                </div>
+                <div class="insight-row"><strong>Top categories (Image 1):</strong> ${cats1}</div>
+                <div class="insight-row"><strong>Top categories (Image 2):</strong> ${cats2}</div>
+                <div class="insight-row"><strong>Category overlap (top-3):</strong> ${overlap}</div>
+                <div class="insight-row"><strong>Dominant method:</strong> ${dominantMethod}</div>
+                <div class="insight-row"><strong>Recommendations:</strong> ${recs.map(r=>`<span class="recommendation">${r}</span>`).join(' ') || '—'}</div>
+            </div>
+        `;
+    }
+
+    loadDiagnostics() {
+        const viz = this.results.visualizations || {};
+        const diag = document.getElementById('diagnosticsViz');
+        if (!diag) return;
+
+        const blocks = [];
+        if (viz.gradcam_overlays) {
+            blocks.push(`<div class="diag-block"><h4>Grad-CAM (semantic focus)</h4><img src="${viz.gradcam_overlays}" alt="Grad-CAM"></div>`);
+        }
+        if (viz.ssim_heatmap) {
+            blocks.push(`<div class="diag-block"><h4>SSIM Heatmap</h4><img src="${viz.ssim_heatmap}" alt="SSIM Heatmap"></div>`);
+        }
+        if (viz.edge_lbp_diffs) {
+            blocks.push(`<div class="diag-block"><h4>Edge & LBP Differences</h4><img src="${viz.edge_lbp_diffs}" alt="Edge LBP Diffs"></div>`);
+        }
+        if (viz.method_attribution) {
+            blocks.push(`<div class="diag-block"><h4>Method Attribution</h4><img src="${viz.method_attribution}" alt="Attribution"></div>`);
+        }
+        if (viz.hist_overlay) {
+            blocks.push(`<div class="diag-block"><h4>RGB Histogram Overlay</h4><img src="${viz.hist_overlay}" alt="Histogram Overlay"></div>`);
+        }
+        if (viz.tsne_features) {
+            blocks.push(`<div class="diag-block"><h4>Feature-space (t-SNE)</h4><img src="${viz.tsne_features}" alt="t-SNE"></div>`);
+        }
+
+        diag.innerHTML = blocks.join('');
     }
 
     resetAnalysis() {
